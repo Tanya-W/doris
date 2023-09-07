@@ -308,6 +308,7 @@ under the License.
         <woodstox.version>6.5.1</woodstox.version>
         <kerby.version>2.0.3</kerby.version>
         <jettison.version>1.5.4</jettison.version>
+        <mysql-connector-j.version>8.0.33</mysql-connector-j.version>
         <vesoft.client.version>3.0.0</vesoft.client.version>
         <!-- paimon -->
         <paimon.version>0.4.0-incubating</paimon.version>
