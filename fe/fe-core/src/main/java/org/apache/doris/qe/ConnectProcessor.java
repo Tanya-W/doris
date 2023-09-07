@@ -45,6 +45,7 @@ import org.apache.doris.common.util.SqlParserUtils;
 import org.apache.doris.common.util.SqlUtils;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.CatalogIf;
+import org.apache.doris.hplsql.executor.HplsqlQueryExecutor;
 import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.mysql.MysqlChannel;
 import org.apache.doris.mysql.MysqlCommand;
@@ -110,6 +111,7 @@ public class ConnectProcessor {
     private final ConnectContext ctx;
     private ByteBuffer packetBuf;
     private StmtExecutor executor = null;
+    private MysqlCommand mysqlCommand = null;
 
     public ConnectProcessor(ConnectContext context) {
         this.ctx = context;
@@ -267,7 +269,7 @@ public class ConnectProcessor {
             ctx.setExecutor(executor);
             executor.execute();
             stmtStr = executeStmt.toSql();
-        } catch (Throwable e)  {
+        } catch (Throwable e) {
             // Catch all throwable.
             // If reach here, maybe palo bug.
             LOG.warn("Process one query failed because unknown reason: ", e);
@@ -371,8 +373,25 @@ public class ConnectProcessor {
         while (ending >= 1 && bytes[ending] == '\0') {
             ending--;
         }
+        this.mysqlCommand = mysqlCommand;
         String originStmt = new String(bytes, 1, ending, StandardCharsets.UTF_8);
+        try {
+            if (ctx.sessionVariable.isEnableHplsql()) {
+                HplsqlQueryExecutor hplsqlQueryExecutor = ctx.getHplsqlQueryExecutor();
+                if (hplsqlQueryExecutor == null) {
+                    hplsqlQueryExecutor = new HplsqlQueryExecutor(this);
+                    ctx.setHplsqlQueryExecutor(hplsqlQueryExecutor);
+                }
+                hplsqlQueryExecutor.execute(originStmt);
+            } else {
+                executeQuery(originStmt);
+            }
+        } catch (Exception ignored) {
+            //
+        }
+    }
 
+    public void executeQuery(String originStmt) throws Exception {
         String sqlHash = DigestUtils.md5Hex(originStmt);
         ctx.setSqlHash(sqlHash);
         ctx.getAuditEventBuilder().reset();
@@ -447,8 +466,7 @@ public class ConnectProcessor {
             } catch (Throwable throwable) {
                 handleQueryException(throwable, auditStmt, executor.getParsedStmt(),
                         executor.getQueryStatisticsForAuditLog());
-                // execute failed, skip remaining stmts
-                break;
+                throw throwable;
             } finally {
                 executor.addProfileToSpan();
             }
@@ -627,7 +645,7 @@ public class ConnectProcessor {
 
     // When any request is completed, it will generally need to send a response packet to the client
     // This method is used to send a response packet to the client
-    private void finalizeCommand() throws IOException {
+    public void finalizeCommand() throws IOException {
         ByteBuffer packet;
         if (executor != null && executor.isForwardToMaster()
                 && ctx.getState().getStateType() != QueryState.MysqlStateType.ERR) {

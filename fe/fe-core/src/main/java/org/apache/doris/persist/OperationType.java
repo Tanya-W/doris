@@ -314,6 +314,15 @@ public class OperationType {
 
     public static final short OP_BARRIER = 436;
 
+    // hplsql 440 ~ 450
+    public static final short OP_ADD_STORED_PROCEDURE = 440;
+
+    public static final short OP_DROP_STORED_PROCEDURE = 441;
+
+    public static final short OP_ADD_HPLSQL_PACKAGE = 442;
+
+    public static final short OP_DROP_HPLSQL_PACKAGE = 443;
+
     // For backward compatible with 2.0.3
     public static final short OP_UPDATE_TABLE_STATS = 455;
 
