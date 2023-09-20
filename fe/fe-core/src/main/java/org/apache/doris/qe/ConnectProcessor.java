@@ -372,6 +372,12 @@ public class ConnectProcessor {
             ending--;
         }
         String originStmt = new String(bytes, 1, ending, StandardCharsets.UTF_8);
+        try {
+            originStmt = handleDbLinkStmt(originStmt);
+        } catch (AnalysisException e) {
+            LOG.warn("handle db link stmt failed. Reason: {}. Statement: \"{}\".",
+                    e.getMessage(), originStmt);
+        }
 
         String sqlHash = DigestUtils.md5Hex(originStmt);
         ctx.setSqlHash(sqlHash);
@@ -455,6 +461,20 @@ public class ConnectProcessor {
 
         }
 
+    }
+
+    private String handleDbLinkStmt(String originStmt) throws AnalysisException {
+        String finalStmt = null;
+        try {
+            finalStmt = new DbLinkStmtTranslator().translateStmt(originStmt);
+        } catch (Exception e) {
+            // TODO: should catch all exception here until we support all db-link syntax.
+            LOG.warn("translate sql failed. Reason: {}. Statement: \"{}\".",
+                    e.getMessage(), originStmt);
+            throw new AnalysisException(
+                    "Internal Error, maybe not support syntax or this is a bug: " + e.getMessage(), e);
+        }
+        return finalStmt == null ? originStmt : finalStmt;
     }
 
     // Use a handler for exception to avoid big try catch block which is a little hard to understand
