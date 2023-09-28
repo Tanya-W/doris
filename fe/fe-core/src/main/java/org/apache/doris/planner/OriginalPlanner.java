@@ -33,15 +33,23 @@ import org.apache.doris.analysis.SlotId;
 import org.apache.doris.analysis.SlotRef;
 import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.analysis.StorageBackend;
+import org.apache.doris.analysis.TableName;
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.catalog.ScalarType;
+import org.apache.doris.catalog.Table;
+import org.apache.doris.catalog.TableIf;
 import org.apache.doris.catalog.Type;
+import org.apache.doris.catalog.external.ExternalTable;
+import org.apache.doris.cluster.ClusterNamespace;
+import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
+import org.apache.doris.datasource.InternalCatalog;
+import org.apache.doris.mysql.privilege.PrivPredicate;
 import org.apache.doris.qe.CommonResultSet;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.ResultSet;
@@ -53,7 +61,10 @@ import org.apache.doris.thrift.TQueryOptions;
 import org.apache.doris.thrift.TRuntimeFilterMode;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -166,6 +177,10 @@ public class OriginalPlanner extends Planner {
         if (statement instanceof InsertStmt) {
             InsertStmt insertStmt = (InsertStmt) statement;
             insertStmt.prepareExpressions();
+        }
+
+        if (Config.enable_col_auth) {
+            checkColumnPrivileges(singleNodePlan);
         }
 
         // TODO chenhao16 , no used materialization work
@@ -303,6 +318,66 @@ public class OriginalPlanner extends Planner {
                     }
                 }
             }
+        }
+    }
+
+    private void checkColumnPrivileges(PlanNode singleNodePlan) throws UserException {
+        if (ConnectContext.get() == null) {
+            return;
+        }
+        // 1. collect all columns from all scan nodes
+        List<ScanNode> scanNodes = Lists.newArrayList();
+        singleNodePlan.collect((PlanNode planNode) -> planNode instanceof ScanNode, scanNodes);
+        // catalog : <db.table : column>
+        Map<String, HashMultimap<TableName, String>> ctlToTableColumnMap = Maps.newHashMap();
+        for (ScanNode scanNode : scanNodes) {
+            if (!scanNode.needToCheckColumnPriv()) {
+                continue;
+            }
+            TupleDescriptor tupleDesc = scanNode.getTupleDesc();
+            TableIf table = tupleDesc.getTable();
+            if (table == null) {
+                continue;
+            }
+            TableName tableName = getFullQualifiedTableNameFromTable(table);
+            for (SlotDescriptor slotDesc : tupleDesc.getSlots()) {
+                if (!slotDesc.isMaterialized()) {
+                    continue;
+                }
+                Column column = slotDesc.getColumn();
+                if (column == null) {
+                    continue;
+                }
+                HashMultimap<TableName, String> tableColumnMap = ctlToTableColumnMap.get(tableName.getCtl());
+                if (tableColumnMap == null) {
+                    tableColumnMap = HashMultimap.create();
+                    ctlToTableColumnMap.put(tableName.getCtl(), tableColumnMap);
+                }
+                tableColumnMap.put(tableName, column.getName());
+                LOG.debug("collect column {} in {}", column.getName(), tableName);
+            }
+        }
+        // 2. check privs
+        // TODO: only support SELECT_PRIV now
+        PrivPredicate wanted = PrivPredicate.SELECT;
+        for (Map.Entry<String, HashMultimap<TableName, String>> entry : ctlToTableColumnMap.entrySet()) {
+            Env.getCurrentEnv().getAccessManager().checkColumnsPriv(ConnectContext.get().getCurrentUserIdentity(),
+                    entry.getKey(), entry.getValue(), wanted);
+        }
+    }
+
+    private TableName getFullQualifiedTableNameFromTable(TableIf table) throws AnalysisException {
+        if (table instanceof Table) {
+            String dbName = ClusterNamespace.getNameFromFullName(((Table) table).getQualifiedDbName());
+            if (Strings.isNullOrEmpty(dbName)) {
+                throw new AnalysisException("failed to get db name from table " + table.getName());
+            }
+            return new TableName(InternalCatalog.INTERNAL_CATALOG_NAME, dbName, table.getName());
+        } else if (table instanceof ExternalTable) {
+            ExternalTable extTable = (ExternalTable) table;
+            return new TableName(extTable.getCatalog().getName(), extTable.getDbName(), extTable.getName());
+        } else {
+            throw new AnalysisException("table " + table.getName() + " is not internal or external table instance");
         }
     }
 

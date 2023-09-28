@@ -36,6 +36,7 @@ import org.apache.doris.catalog.View;
 import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.ColumnAliasGenerator;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.ErrorCode;
 import org.apache.doris.common.ErrorReport;
 import org.apache.doris.common.Pair;
@@ -396,7 +397,10 @@ public class SelectStmt extends QueryStmt {
                     view.getQueryStmt().getTables(analyzer, expandView, tableMap, parentViewNameSet);
                 } else {
                     // check auth
-                    if (!Env.getCurrentEnv().getAccessManager()
+                    if (Config.enable_col_auth) {
+                        // do nothing (temporarily)
+                        // TODO: more general implement
+                    } else if (!Env.getCurrentEnv().getAccessManager()
                             .checkTblPriv(ConnectContext.get(), tblRef.getName(), PrivPredicate.SELECT)) {
                         ErrorReport.reportAnalysisException(ErrorCode.ERR_TABLEACCESS_DENIED_ERROR, "SELECT",
                                 ConnectContext.get().getQualifiedUser(), ConnectContext.get().getRemoteIP(),
