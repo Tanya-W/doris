@@ -127,6 +127,8 @@ public class PropertyAnalyzer {
 
     public static final String PROPERTIES_STORE_ROW_COLUMN = "store_row_column";
 
+    public static final String PROPERTIES_STORAGE_MODEL = "storage_model";
+
     public static final String PROPERTIES_SKIP_WRITE_INDEX_ON_LOAD = "skip_write_index_on_load";
 
     public static final String PROPERTIES_COMPACTION_POLICY = "compaction_policy";
@@ -170,6 +172,11 @@ public class PropertyAnalyzer {
     public static final long TIME_SERIES_COMPACTION_GOAL_SIZE_MBYTES_DEFAULT_VALUE = 1024;
     public static final long TIME_SERIES_COMPACTION_FILE_COUNT_THRESHOLD_DEFAULT_VALUE = 2000;
     public static final long TIME_SERIES_COMPACTION_TIME_THRESHOLD_SECONDS_DEFAULT_VALUE = 3600;
+
+    // store model
+    public static final String ROW_STORAGE = "row_storage";
+    public static final String COLUMN_STORAGE = "column_storage";
+    public static final String HYBRID_STORAGE = "hybrid_storage";
 
 
     /**
@@ -618,6 +625,27 @@ public class PropertyAnalyzer {
         }
         throw new AnalysisException(PROPERTIES_STORE_ROW_COLUMN
                 + " must be `true` or `false`");
+    }
+
+    public static String analyzeStorageModel(Map<String, String> properties) throws AnalysisException {
+        if (properties == null || properties.isEmpty()) {
+            return COLUMN_STORAGE;
+        }
+        String storageModel = properties.get(PROPERTIES_STORAGE_MODEL);
+        if (null == storageModel) {
+            return COLUMN_STORAGE;
+        }
+        properties.remove(PROPERTIES_STORAGE_MODEL);
+        if (storageModel.equals(ROW_STORAGE)) {
+            return ROW_STORAGE;
+        } else if (storageModel.equals(COLUMN_STORAGE)) {
+            return COLUMN_STORAGE;
+        } else if (storageModel.equals(HYBRID_STORAGE)) {
+            return HYBRID_STORAGE;
+        }
+        throw new AnalysisException(PROPERTIES_STORAGE_MODEL
+                        + " must be " + ROW_STORAGE + " or " + COLUMN_STORAGE
+                        + " or " + HYBRID_STORAGE);
     }
 
     public static Boolean analyzeSkipWriteIndexOnLoad(Map<String, String> properties) throws AnalysisException {

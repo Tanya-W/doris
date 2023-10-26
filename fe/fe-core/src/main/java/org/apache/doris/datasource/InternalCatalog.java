@@ -2217,6 +2217,14 @@ public class InternalCatalog implements CatalogIf<Database> {
         }
         olapTable.setStoreRowColumn(storeRowColumn);
 
+        String storageModel = PropertyAnalyzer.COLUMN_STORAGE;
+        try {
+            storageModel = PropertyAnalyzer.analyzeStorageModel(properties);
+        } catch (AnalysisException e) {
+            throw new DdlException(e.getMessage());
+        }
+        olapTable.setStorageModel(storageModel);
+
         // set skip inverted index on load
         boolean skipWriteIndexOnLoad = PropertyAnalyzer.analyzeBooleanProp(properties,
                 PropertyAnalyzer.PROPERTIES_SKIP_WRITE_INDEX_ON_LOAD, false);

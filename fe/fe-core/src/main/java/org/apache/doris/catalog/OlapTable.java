@@ -1855,6 +1855,19 @@ public class OlapTable extends Table {
         return false;
     }
 
+    public void setStorageModel(String storageModel) {
+        TableProperty tableProperty = getOrCreatTableProperty();
+        tableProperty.modifyTableProperties(PropertyAnalyzer.PROPERTIES_STORAGE_MODEL, storageModel);
+        tableProperty.buildStorageModel();
+    }
+
+    public String getStorageModel() {
+        if (tableProperty != null) {
+            return tableProperty.storageModel();
+        }
+        return "";
+    }
+
     public void setSkipWriteIndexOnLoad(boolean skipWriteIndexOnLoad) {
         TableProperty tableProperty = getOrCreatTableProperty();
         tableProperty.modifyTableProperties(PropertyAnalyzer.PROPERTIES_SKIP_WRITE_INDEX_ON_LOAD,

@@ -3143,6 +3143,12 @@ public class Env {
                 sb.append(olapTable.storeRowColumn()).append("\"");
             }
 
+            // storage model
+            if (olapTable.getStorageModel() != null && !olapTable.getStorageModel().equals("")) {
+                sb.append(",\n\"").append(PropertyAnalyzer.PROPERTIES_STORAGE_MODEL).append("\" = \"");
+                sb.append(olapTable.getStorageModel()).append("\"");
+            }
+
             // skip inverted index on load
             if (olapTable.skipWriteIndexOnLoad()) {
                 sb.append(",\n\"").append(PropertyAnalyzer.PROPERTIES_SKIP_WRITE_INDEX_ON_LOAD).append("\" = \"");

@@ -86,6 +86,8 @@ public class TableProperty implements Writable {
 
     private boolean skipWriteIndexOnLoad = false;
 
+    private String storageModel = PropertyAnalyzer.COLUMN_STORAGE;
+
     private String compactionPolicy = PropertyAnalyzer.SIZE_BASED_COMPACTION_POLICY;
 
     private long timeSeriesCompactionGoalSizeMbytes
@@ -219,6 +221,16 @@ public class TableProperty implements Writable {
 
     public boolean storeRowColumn() {
         return storeRowColumn;
+    }
+
+    public TableProperty buildStorageModel() {
+        storageModel = properties.getOrDefault(PropertyAnalyzer.PROPERTIES_STORAGE_MODEL,
+                PropertyAnalyzer.COLUMN_STORAGE);
+        return this;
+    }
+
+    public String storageModel() {
+        return storageModel;
     }
 
     public TableProperty buildSkipWriteIndexOnLoad() {
@@ -507,6 +519,7 @@ public class TableProperty implements Writable {
                 .buildBinlogConfig()
                 .buildEnableLightSchemaChange()
                 .buildStoreRowColumn()
+                .buildStorageModel()
                 .buildSkipWriteIndexOnLoad()
                 .buildCompactionPolicy()
                 .buildTimeSeriesCompactionGoalSizeMbytes()
